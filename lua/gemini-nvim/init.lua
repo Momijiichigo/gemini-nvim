@@ -50,7 +50,7 @@ function M.start_chat(prompt)
     launcher_cmd = launcher .. " --debug"
   end
 
-  local add_cmd = { "gemini", "mcp", "add", "coc-nvim-mcp", launcher_cmd }
+  local add_cmd = { "gemini", "mcp", "add", "-s", "user", "--trust", "coc-nvim-mcp", launcher_cmd }
 
   -- Register/Update the MCP server in gemini CLI
   vim.system(add_cmd, { text = true, env = { NVIM = vim.v.servername } }, function(obj)
