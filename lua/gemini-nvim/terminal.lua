@@ -43,6 +43,18 @@ function M.open(cmd_args, opts)
   else
     vim.cmd("enew")
     bufnr = vim.api.nvim_get_current_buf()
+
+    -- Ensure autoread is on so checktime works better
+    vim.o.autoread = true
+    
+    -- Trigger checktime when entering the terminal to pick up changes from the CLI
+    vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter", "TermEnter" }, {
+      group = augroup,
+      buffer = bufnr,
+      callback = function()
+        vim.cmd("checktime")
+      end,
+    })
     
     local cmd = { "gemini" }
     if cmd_args then
@@ -72,6 +84,28 @@ function M.open(cmd_args, opts)
         vim.schedule(enforce_right_position)
       end,
     })
+
+    -- Fallback for pre-0.10: Ensure the buffer remains Gemini's in its dedicated window
+    if vim.fn.has("nvim-0.10") == 0 then
+      vim.api.nvim_create_autocmd("BufEnter", {
+        group = augroup,
+        callback = function()
+          local cur_win = vim.api.nvim_get_current_win()
+          if cur_win == winid and bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+            local cur_buf = vim.api.nvim_get_current_buf()
+            if cur_buf ~= bufnr then
+              vim.api.nvim_win_set_buf(winid, bufnr)
+            end
+          end
+        end,
+      })
+    end
+  end
+
+  -- Prevent the window from being overridden by other buffers
+  -- This must happen AFTER the buffer is set to avoid E1513
+  if vim.fn.has("nvim-0.10") == 1 then
+    vim.wo[winid].winfixbuf = true
   end
   
   vim.cmd("startinsert")

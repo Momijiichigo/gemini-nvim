@@ -10,6 +10,42 @@ local config = {
 
 function M.setup(opts)
   config = vim.tbl_deep_extend("force", config, opts or {})
+  
+  -- Enable autoread globally
+  vim.o.autoread = true
+  
+  -- Trigger checktime on FocusGained and when entering buffers
+  local group = vim.api.nvim_create_augroup("GeminiAutoUpdate", { clear = true })
+  vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "WinEnter" }, {
+    group = group,
+    callback = function()
+      if vim.api.nvim_get_mode().mode ~= "c" then
+        vim.cmd("checktime")
+      end
+    end,
+  })
+end
+
+function M.handle_edit(file_path, new_content)
+  local diff = require("gemini-nvim.diff")
+  -- Use vim.fn.bufnr with the full path to avoid issues with relative names
+  local full_path = vim.fn.fnamemodify(file_path, ":p")
+  local bufnr = vim.fn.bufnr(full_path)
+  
+  if config.debug then
+    vim.notify(string.format("gemini-nvim: handle_edit called for %s (bufnr: %d)", full_path, bufnr), vim.log.levels.INFO)
+  end
+
+  if bufnr == -1 then
+    -- If file not in buffer, open it first
+    bufnr = vim.fn.bufadd(full_path)
+    vim.fn.bufload(bufnr)
+    if config.debug then
+      vim.notify(string.format("gemini-nvim: Buffer added for %s (new bufnr: %d)", full_path, bufnr), vim.log.levels.INFO)
+    end
+  end
+
+  diff.apply_changes(bufnr, new_content)
 end
 
 function M.start_chat(prompt)

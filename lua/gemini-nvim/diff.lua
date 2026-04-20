@@ -1,5 +1,18 @@
 local M = {}
 
+function M.apply_changes(original_buf, new_content)
+  local lines = vim.split(new_content, "\n", { plain = true })
+  if lines[#lines] == "" then
+    table.remove(lines, #lines)
+  end
+  vim.api.nvim_buf_set_lines(original_buf, 0, -1, false, lines)
+  
+  -- Always try to save the buffer
+  vim.api.nvim_buf_call(original_buf, function()
+    vim.cmd("silent! write")
+  end)
+end
+
 function M.show_diff(original_buf, new_content)
   local ft = vim.bo[original_buf].filetype
   
@@ -11,7 +24,10 @@ function M.show_diff(original_buf, new_content)
   vim.bo[scratch_buf].swapfile = false
   
   -- Set new content in scratch buffer
-  local lines = vim.split(new_content, "\n")
+  local lines = vim.split(new_content, "\n", { plain = true })
+  if lines[#lines] == "" then
+    table.remove(lines, #lines)
+  end
   vim.api.nvim_buf_set_lines(scratch_buf, 0, -1, false, lines)
   
   -- Split and show
