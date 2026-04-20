@@ -4,36 +4,24 @@ local bufnr = nil
 local winid = nil
 local augroup = vim.api.nvim_create_augroup("GeminiTerminal", { clear = true })
 
-local function enforce_right_position()
-  if winid and vim.api.nvim_win_is_valid(winid) then
-    local current_win = vim.api.nvim_get_current_win()
-    vim.api.nvim_set_current_win(winid)
-    vim.cmd("wincmd L")
-    vim.api.nvim_set_current_win(current_win)
-  end
-end
-
 function M.open(cmd_args, opts)
   opts = opts or {}
   local split_side = opts.split_side or "right"
   local split_width = opts.split_width or 0.3
 
   if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-    -- Check if visible
     local wins = vim.fn.win_findbuf(bufnr)
     if #wins > 0 then
       winid = wins[1]
       vim.api.nvim_set_current_win(winid)
-      enforce_right_position()
       return
     end
-    -- Not visible, create split
   end
 
   local width = math.floor(vim.o.columns * split_width)
-  -- Always use botright for gemini-nvim to start at the edge
-  local modifier = "botright "
+  if width < 20 then width = 40 end -- Sanity check
   
+  local modifier = "botright "
   vim.cmd(modifier .. width .. "vsplit")
   winid = vim.api.nvim_get_current_win()
   vim.wo[winid].winfixwidth = true
@@ -44,18 +32,6 @@ function M.open(cmd_args, opts)
     vim.cmd("enew")
     bufnr = vim.api.nvim_get_current_buf()
 
-    -- Ensure autoread is on so checktime works better
-    vim.o.autoread = true
-    
-    -- Trigger checktime when entering the terminal to pick up changes from the CLI
-    vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter", "TermEnter" }, {
-      group = augroup,
-      buffer = bufnr,
-      callback = function()
-        vim.cmd("checktime")
-      end,
-    })
-    
     local cmd = { "gemini" }
     if cmd_args then
       for _, arg in ipairs(cmd_args) do
@@ -68,42 +44,32 @@ function M.open(cmd_args, opts)
         NVIM = vim.v.servername,
         NVIM_LISTEN_ADDRESS = vim.v.servername,
       },
-      on_exit = function()
+      on_exit = function(_, exit_code)
+        if exit_code ~= 0 and exit_code ~= 130 then -- 130 is Ctrl-C
+          vim.schedule(function()
+            vim.notify("Gemini process exited with code " .. exit_code, vim.log.levels.ERROR)
+          end)
+        end
+        
         bufnr = nil
         if winid and vim.api.nvim_win_is_valid(winid) then
           vim.api.nvim_win_close(winid, true)
         end
-        vim.api.nvim_clear_autocmds({ group = augroup })
+        winid = nil
       end
     })
 
-    -- Enforce position when a new window is created
-    vim.api.nvim_create_autocmd({ "WinNew", "BufWinEnter" }, {
+    -- Trigger checktime when entering the terminal to pick up changes from the CLI
+    vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter", "TermEnter" }, {
       group = augroup,
+      buffer = bufnr,
       callback = function()
-        vim.schedule(enforce_right_position)
+        vim.cmd("silent! checktime")
       end,
     })
-
-    -- Fallback for pre-0.10: Ensure the buffer remains Gemini's in its dedicated window
-    if vim.fn.has("nvim-0.10") == 0 then
-      vim.api.nvim_create_autocmd("BufEnter", {
-        group = augroup,
-        callback = function()
-          local cur_win = vim.api.nvim_get_current_win()
-          if cur_win == winid and bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-            local cur_buf = vim.api.nvim_get_current_buf()
-            if cur_buf ~= bufnr then
-              vim.api.nvim_win_set_buf(winid, bufnr)
-            end
-          end
-        end,
-      })
-    end
   end
 
-  -- Prevent the window from being overridden by other buffers
-  -- This must happen AFTER the buffer is set to avoid E1513
+  -- Prevent the window from being overridden by other buffers (Neovim 0.10+)
   if vim.fn.has("nvim-0.10") == 1 then
     vim.wo[winid].winfixbuf = true
   end

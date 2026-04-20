@@ -33,7 +33,6 @@ function M.setup(opts)
 end
 
 function M.handle_edit(file_path, new_content)
-  local diff = require("gemini-nvim.diff")
   local full_path = vim.fn.fnamemodify(file_path, ":p")
   local bufnr = vim.fn.bufnr(full_path)
   
@@ -42,15 +41,25 @@ function M.handle_edit(file_path, new_content)
     vim.fn.bufload(bufnr)
   end
 
-  -- This remains for manual diff review when triggered by the UI
-  diff.show_diff(bufnr, new_content)
+  local lines = vim.split(new_content, "\n", { plain = true })
+  if lines[#lines] == "" then
+    table.remove(lines, #lines)
+  end
+  
+  -- Apply changes directly to the buffer
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+  
+  -- Always try to save the buffer
+  vim.api.nvim_buf_call(bufnr, function()
+    vim.cmd("silent! write")
+  end)
 end
 
 function M.initialize_mcp()
   -- Go up 4 levels from lua/gemini-nvim/init.lua to reach workspace root
   local workspace_root = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h:h")
   local launcher = workspace_root .. "/coc-nvim-mcp/coc-mcp-launcher.sh"
-  local skill_dir = workspace_root .. "/coc-nvim-mcp"
+  local skill_file = workspace_root .. "/coc-nvim-mcp/skill"
   
   local launcher_cmd = launcher
   if config.debug then
@@ -58,7 +67,7 @@ function M.initialize_mcp()
   end
 
   local add_cmd = { "gemini", "mcp", "add", "-s", "user", "--trust", "coc-nvim-mcp", launcher_cmd }
-  local skill_cmd = { "gemini", "skills", "install", skill_dir, "--scope", "user" }
+  local skill_cmd = { "gemini", "skills", "install", skill_file, "--scope", "user" }
 
   -- Register/Update the MCP server in gemini CLI
   vim.system(add_cmd, { text = true, env = { NVIM = vim.v.servername } }, function(obj)
