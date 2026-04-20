@@ -66,29 +66,45 @@ function M.initialize_mcp()
     launcher_cmd = launcher .. " --debug"
   end
 
-  local add_cmd = { "gemini", "mcp", "add", "-s", "user", "--trust", "coc-nvim-mcp", launcher_cmd }
-  local skill_cmd = { "gemini", "skills", "install", skill_file, "--scope", "user" }
+  -- We use a terminal buffer for initialization because gemini skills install
+  -- may require interactive consent from the user.
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.bo[buf].bufhidden = "wipe"
+  local width = math.floor(vim.o.columns * 0.8)
+  local height = math.floor(vim.o.lines * 0.8)
+  local win = vim.api.nvim_open_win(buf, true, {
+    relative = "editor",
+    width = width,
+    height = height,
+    col = math.floor((vim.o.columns - width) / 2),
+    row = math.floor((vim.o.lines - height) / 2),
+    style = "minimal",
+    border = "rounded",
+    title = " Gemini Initialization ",
+    title_pos = "center",
+  })
 
-  -- Register/Update the MCP server in gemini CLI
-  vim.system(add_cmd, { text = true, env = { NVIM = vim.v.servername } }, function(obj)
-    vim.schedule(function()
-      if obj.code ~= 0 then
-        vim.notify("gemini-nvim: Failed to register MCP server: " .. (obj.stderr or "unknown error"), vim.log.levels.ERROR)
-        return
-      end
-      
-      -- If MCP registration is successful, install the skill
-      vim.system(skill_cmd, { text = true }, function(skill_obj)
-        vim.schedule(function()
-          if skill_obj.code ~= 0 then
-            vim.notify("gemini-nvim: Failed to install skill: " .. (skill_obj.stderr or "unknown error"), vim.log.levels.ERROR)
-          else
-            vim.notify("gemini-nvim: MCP server and skill registered successfully", vim.log.levels.INFO)
+  local add_cmd = string.format("gemini mcp add -s user --trust coc-nvim-mcp %s", vim.fn.shellescape(launcher_cmd))
+  local skill_cmd = string.format("gemini skills install %s --scope user", vim.fn.shellescape(skill_file))
+  local full_cmd = add_cmd .. " && " .. skill_cmd
+
+  vim.fn.termopen(full_cmd, {
+    env = { NVIM = vim.v.servername },
+    on_exit = function(_, code)
+      vim.schedule(function()
+        if code == 0 then
+          if vim.api.nvim_win_is_valid(win) then
+            vim.api.nvim_win_close(win, true)
           end
-        end)
+          vim.notify("gemini-nvim: MCP server and skill registered successfully", vim.log.levels.INFO)
+        else
+          vim.notify("gemini-nvim: Initialization failed with code " .. code .. ". Check the terminal buffer for details.", vim.log.levels.ERROR)
+        end
       end)
-    end)
-  end)
+    end
+  })
+  
+  vim.cmd("startinsert")
 end
 
 function M.start_chat(prompt)
