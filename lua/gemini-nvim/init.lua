@@ -50,7 +50,7 @@ function M.initialize_mcp()
   -- Go up 4 levels from lua/gemini-nvim/init.lua to reach workspace root
   local workspace_root = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h:h")
   local launcher = workspace_root .. "/coc-nvim-mcp/coc-mcp-launcher.sh"
-  local skill_file = workspace_root .. "/coc-nvim-mcp/SKILL.md"
+  local skill_dir = workspace_root .. "/coc-nvim-mcp"
   
   local launcher_cmd = launcher
   if config.debug then
@@ -58,7 +58,7 @@ function M.initialize_mcp()
   end
 
   local add_cmd = { "gemini", "mcp", "add", "-s", "user", "--trust", "coc-nvim-mcp", launcher_cmd }
-  local skill_cmd = { "gemini", "skills", "install", skill_file, "--scope", "user" }
+  local skill_cmd = { "gemini", "skills", "install", skill_dir, "--scope", "user" }
 
   -- Register/Update the MCP server in gemini CLI
   vim.system(add_cmd, { text = true, env = { NVIM = vim.v.servername } }, function(obj)
