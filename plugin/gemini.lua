@@ -14,3 +14,7 @@ vim.api.nvim_create_user_command("Gemini", function(opts)
 
   require("gemini-nvim").start_chat(prompt)
 end, { nargs = "*", range = true })
+
+vim.api.nvim_create_user_command("GeminiInit", function()
+  require("gemini-nvim").initialize_mcp()
+end, {})

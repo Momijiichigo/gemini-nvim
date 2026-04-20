@@ -6,6 +6,7 @@ local config = {
   split_side = "right",
   split_width = 0.3,
   debug = false,
+  coc_mcp = false,
 }
 
 function M.setup(opts)
@@ -24,6 +25,11 @@ function M.setup(opts)
       end
     end,
   })
+
+  -- Automatically initialize MCP if enabled
+  if config.coc_mcp then
+    M.initialize_mcp()
+  end
 end
 
 function M.handle_edit(file_path, new_content)
@@ -40,10 +46,11 @@ function M.handle_edit(file_path, new_content)
   diff.show_diff(bufnr, new_content)
 end
 
-function M.start_chat(prompt)
+function M.initialize_mcp()
   -- Go up 4 levels from lua/gemini-nvim/init.lua to reach workspace root
   local workspace_root = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h:h")
   local launcher = workspace_root .. "/coc-nvim-mcp/coc-mcp-launcher.sh"
+  local skill_file = workspace_root .. "/coc-nvim-mcp/SKILL.md"
   
   local launcher_cmd = launcher
   if config.debug then
@@ -51,21 +58,36 @@ function M.start_chat(prompt)
   end
 
   local add_cmd = { "gemini", "mcp", "add", "-s", "user", "--trust", "coc-nvim-mcp", launcher_cmd }
+  local skill_cmd = { "gemini", "skills", "install", skill_file, "--scope", "user" }
 
   -- Register/Update the MCP server in gemini CLI
   vim.system(add_cmd, { text = true, env = { NVIM = vim.v.servername } }, function(obj)
     vim.schedule(function()
       if obj.code ~= 0 then
         vim.notify("gemini-nvim: Failed to register MCP server: " .. (obj.stderr or "unknown error"), vim.log.levels.ERROR)
+        return
       end
       
-      local cmd_args = nil
-      if prompt and prompt ~= "" then
-        cmd_args = { "-i", prompt }
-      end
-      terminal.toggle(cmd_args, config)
+      -- If MCP registration is successful, install the skill
+      vim.system(skill_cmd, { text = true }, function(skill_obj)
+        vim.schedule(function()
+          if skill_obj.code ~= 0 then
+            vim.notify("gemini-nvim: Failed to install skill: " .. (skill_obj.stderr or "unknown error"), vim.log.levels.ERROR)
+          else
+            vim.notify("gemini-nvim: MCP server and skill registered successfully", vim.log.levels.INFO)
+          end
+        end)
+      end)
     end)
   end)
+end
+
+function M.start_chat(prompt)
+  local cmd_args = nil
+  if prompt and prompt ~= "" then
+    cmd_args = { "-i", prompt }
+  end
+  terminal.toggle(cmd_args, config)
 end
 
 return M
