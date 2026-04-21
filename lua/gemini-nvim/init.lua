@@ -1,6 +1,7 @@
 local M = {}
 local mcp = require("gemini-nvim.mcp")
 local terminal = require("gemini-nvim.terminal")
+local watcher = require("gemini-nvim.watcher")
 
 local config = {
   split_side = "right",
@@ -26,8 +27,10 @@ function M.setup(opts)
     end,
   })
 
-  M.config = config
+  -- Start proactive file watching
+  watcher.setup()
 
+  M.config = config
 end
 
 function M.handle_edit(file_path, new_content)
