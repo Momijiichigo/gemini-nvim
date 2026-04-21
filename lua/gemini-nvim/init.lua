@@ -26,10 +26,8 @@ function M.setup(opts)
     end,
   })
 
-  -- Automatically initialize MCP if enabled
-  if config.coc_mcp then
-    M.initialize_mcp()
-  end
+  M.config = config
+
 end
 
 function M.handle_edit(file_path, new_content)
