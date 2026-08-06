@@ -59,15 +59,27 @@ end
 function M.initialize_mcp()
   -- Go up 4 levels from lua/gemini-nvim/init.lua to reach workspace root
   local workspace_root = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h:h")
-  local launcher = workspace_root .. "/coc-nvim-mcp/coc-mcp-launcher.sh"
-  local skill_file = workspace_root .. "/coc-nvim-mcp/skill"
+  local plugin_dir = workspace_root .. "/coc-nvim-mcp"
+  local launcher = plugin_dir .. "/coc-mcp-launcher.sh"
   
   local launcher_cmd = launcher
   if config.debug then
     launcher_cmd = launcher .. " --debug"
   end
 
-  -- We use a terminal buffer for initialization because gemini skills install
+  -- Generate mcp_config.json for the plugin
+  local mcp_config = {
+    mcpServers = {
+      ["coc-nvim-mcp"] = {
+        command = "bash",
+        args = { "-c", launcher_cmd }
+      }
+    }
+  }
+  local json_str = vim.fn.json_encode(mcp_config)
+  vim.fn.writefile({json_str}, plugin_dir .. "/mcp_config.json")
+
+  -- We use a terminal buffer for initialization because agy plugin install
   -- may require interactive consent from the user.
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = "wipe"
@@ -81,15 +93,13 @@ function M.initialize_mcp()
     row = math.floor((vim.o.lines - height) / 2),
     style = "minimal",
     border = "rounded",
-    title = " Gemini Initialization ",
+    title = " Agy Initialization ",
     title_pos = "center",
   })
 
-  local add_cmd = string.format("gemini mcp add -s user --trust coc-nvim-mcp %s", vim.fn.shellescape(launcher_cmd))
-  local skill_cmd = string.format("gemini skills install %s --scope user", vim.fn.shellescape(skill_file))
-  local full_cmd = add_cmd .. " && " .. skill_cmd
+  local install_cmd = string.format("agy plugin install %s", vim.fn.shellescape(plugin_dir))
 
-  vim.fn.termopen(full_cmd, {
+  vim.fn.termopen(install_cmd, {
     env = { NVIM = vim.v.servername },
     on_exit = function(_, code)
       vim.schedule(function()

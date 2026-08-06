@@ -32,7 +32,7 @@ function M.open(cmd_args, opts)
     vim.cmd("enew")
     bufnr = vim.api.nvim_get_current_buf()
 
-    local cmd = { "gemini" }
+    local cmd = { "agy" }
     if cmd_args then
       for _, arg in ipairs(cmd_args) do
         table.insert(cmd, arg)
@@ -47,7 +47,7 @@ function M.open(cmd_args, opts)
       on_exit = function(_, exit_code)
         if exit_code ~= 0 and exit_code ~= 130 then -- 130 is Ctrl-C
           vim.schedule(function()
-            vim.notify("Gemini process exited with code " .. exit_code, vim.log.levels.ERROR)
+            vim.notify("Agy process exited with code " .. exit_code, vim.log.levels.ERROR)
           end)
         end
         

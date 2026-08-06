@@ -1,0 +1,9 @@
+{
+  "workspace": {
+    "library": [
+      "${3rd}/luassert/library",
+      "/usr/share/nvim/runtime/lua"
+    ],
+    "checkThirdParty": false
+  }
+}
