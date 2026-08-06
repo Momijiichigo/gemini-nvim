@@ -59,6 +59,12 @@ function M.open(cmd_args, opts)
       end
     })
 
+    -- Send raw Escape to the terminal process when <C-Esc> is pressed
+    vim.keymap.set('t', '<C-Esc>', function()
+      local esc = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
+      vim.api.nvim_feedkeys(esc, "n", false)
+    end, { buffer = bufnr })
+
     -- Trigger checktime when entering the terminal to pick up changes from the CLI
     vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter", "TermEnter" }, {
       group = augroup,

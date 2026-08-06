@@ -59,15 +59,23 @@ end
 function M.initialize_mcp()
   -- Go up 4 levels from lua/gemini-nvim/init.lua to reach workspace root
   local workspace_root = vim.fn.fnamemodify(debug.getinfo(1).source:sub(2), ":h:h:h:h")
-  local plugin_dir = workspace_root .. "/coc-nvim-mcp"
-  local launcher = plugin_dir .. "/coc-mcp-launcher.sh"
+  local coc_dir = workspace_root .. "/coc-nvim-mcp"
+  local launcher = coc_dir .. "/coc-mcp-launcher.sh"
   
   local launcher_cmd = launcher
   if config.debug then
     launcher_cmd = launcher .. " --debug"
   end
 
-  -- Generate mcp_config.json for the plugin
+  -- Create a temporary plugin directory
+  local temp_dir = vim.fn.tempname()
+  vim.fn.mkdir(temp_dir .. "/skills/coc-nvim-mcp", "p")
+
+  -- 1. Create plugin.json
+  local plugin_json = { name = "coc-nvim-mcp" }
+  vim.fn.writefile({vim.fn.json_encode(plugin_json)}, temp_dir .. "/plugin.json")
+
+  -- 2. Generate mcp_config.json
   local mcp_config = {
     mcpServers = {
       ["coc-nvim-mcp"] = {
@@ -76,8 +84,22 @@ function M.initialize_mcp()
       }
     }
   }
-  local json_str = vim.fn.json_encode(mcp_config)
-  vim.fn.writefile({json_str}, plugin_dir .. "/mcp_config.json")
+  vim.fn.writefile({vim.fn.json_encode(mcp_config)}, temp_dir .. "/mcp_config.json")
+
+  -- 3. Copy skill file if it exists
+  local old_skill = coc_dir .. "/skill/SKILL.md"
+  local new_skill = coc_dir .. "/skills/coc-nvim-mcp/SKILL.md"
+  local skill_src = nil
+  if vim.fn.filereadable(new_skill) == 1 then
+    skill_src = new_skill
+  elseif vim.fn.filereadable(old_skill) == 1 then
+    skill_src = old_skill
+  end
+  
+  if skill_src then
+    local skill_lines = vim.fn.readfile(skill_src)
+    vim.fn.writefile(skill_lines, temp_dir .. "/skills/coc-nvim-mcp/SKILL.md")
+  end
 
   -- We use a terminal buffer for initialization because agy plugin install
   -- may require interactive consent from the user.
@@ -97,7 +119,7 @@ function M.initialize_mcp()
     title_pos = "center",
   })
 
-  local install_cmd = string.format("agy plugin install %s", vim.fn.shellescape(plugin_dir))
+  local install_cmd = string.format("agy plugin install %s", vim.fn.shellescape(temp_dir))
 
   vim.fn.termopen(install_cmd, {
     env = { NVIM = vim.v.servername },
